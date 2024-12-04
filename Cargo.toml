@@ -1,5 +1,5 @@
 [package]
-name = "wgpu-rust"
+name = "wgpu-game-of-life-rust"
 version = "0.1.0"
 edition = "2021"
 

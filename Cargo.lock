@@ -1684,6 +1684,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wgpu-game-of-life-rust"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "wgpu-hal"
 version = "23.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1726,18 +1738,6 @@ dependencies = [
  "wgpu-types",
  "windows",
  "windows-core",
-]
-
-[[package]]
-name = "wgpu-rust"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "env_logger",
- "log",
- "pollster",
- "wgpu",
- "winit",
 ]
 
 [[package]]
