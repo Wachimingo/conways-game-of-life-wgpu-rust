@@ -267,7 +267,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..VERTICES.len() as u32, 0..1);
+            render_pass.draw(0..VERTICES.len() as u32, 0..((GRID_SIZE * GRID_SIZE) as u32));
         }
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
