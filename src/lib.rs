@@ -55,7 +55,7 @@ const VERTICES: &[Vertex] = &[
     Vertex { position: [-0.8, 0.8]}
 ];
 
-const GRID_SIZE: f32 = 4.0;
+const GRID_SIZE: f32 = 32.0;
 
 #[rustfmt::skip]
 const GRID: &[GridUniform] = &[
@@ -128,7 +128,7 @@ impl<'a> State<'a> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
