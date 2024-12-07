@@ -15,8 +15,11 @@ struct State<'a> {
     size: winit::dpi::PhysicalSize<u32>,
     window: &'a Window,
     render_pipeline: wgpu::RenderPipeline,
+    compute_pipeline: wgpu::ComputePipeline,
     vertex_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    cell_bind_group: wgpu::BindGroup,
+    compute_bind_group: [wgpu::BindGroup; 2],
+    step: u8,
 }
 
 #[repr(C)]
@@ -125,8 +128,22 @@ impl<'a> State<'a> {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
+        let cell_state_storage_buffer = [
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cell state A buffer"),
+                contents: bytemuck::cast_slice(GRID),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, 
+            }),
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Cell state B buffer"),
+                contents: bytemuck::cast_slice(GRID),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, 
+            }),
+        ];
+
+        let cell_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+            wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
@@ -135,30 +152,121 @@ impl<'a> State<'a> {
                     min_binding_size: None,
                 },
                 count: None,
-            }],
-            label: Some("Binding group layout"),
+            },
+            //wgpu::BindGroupLayoutEntry {
+            //    binding: 1,
+            //    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::COMPUTE,
+            //    ty: wgpu::BindingType::Buffer {
+            //        ty: wgpu::BufferBindingType::Storage {
+            //            read_only: true,
+            //        },
+            //        has_dynamic_offset: false,
+            //        min_binding_size: None,
+            //    },
+            //    count: None,
+            //},
+            ],
+            label: Some("Cell binding group layout"),
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
+        let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage {
+                            read_only: true,
+                        },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage {
+                            read_only: false,
+                        },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+            label: Some("Compute bind group layout"),
+        });
+
+        let cell_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &cell_bind_group_layout,
+            entries: &[
+            wgpu::BindGroupEntry {
                 binding: 0,
                 resource: grid_uniform_buffer.as_entire_binding(),
-            }],
-            label: Some("Bind group"),
+            },
+            //wgpu::BindGroupEntry {
+            //    binding: 1,
+            //    resource: cell_state_storage_buffer.as_entire_binding(),
+            //}
+            ],
+            label: Some("Cell Bind group"),
         });
+
+        let compute_bind_group = [
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &compute_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: cell_state_storage_buffer[1].as_entire_binding(),
+                    },
+                ],
+                label: Some("Compute bind group"),
+            }),
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &compute_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: cell_state_storage_buffer[1].as_entire_binding(),
+                    },
+                ],
+                label: Some("Compute bind group"),
+            }),
+        ];
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
         });
 
+        let compute = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Compute shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/compute.wgsl").into()),
+        });
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render pipeline Layout"),
-                bind_group_layouts: &[&bind_group_layout],
+                bind_group_layouts: &[&cell_bind_group_layout],
                 push_constant_ranges: &[],
-            });
+        });
+
+        let compute_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Compute pipeline layout"),
+            bind_group_layouts: &[&compute_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
@@ -202,6 +310,15 @@ impl<'a> State<'a> {
             cache: None,
         });
 
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Compute pipeline"),
+            layout: Some(&compute_pipeline_layout),
+            module: &compute,
+            entry_point: Some("computeMain"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+
         Self {
             window,
             surface,
@@ -210,8 +327,11 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipeline,
+            compute_pipeline,
             vertex_buffer,
-            bind_group,
+            cell_bind_group,
+            compute_bind_group,
+            step: 0,
         }
     }
 
@@ -244,6 +364,16 @@ impl<'a> State<'a> {
                 label: Some("Render Encoder"),
             });
         {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Compute pass"),
+                timestamp_writes: None,
+            });
+
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group[(&self.step % 2) as usize], &[]);
+            compute_pass.dispatch_workgroups(1, 1, 1);
+        }
+        {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -265,7 +395,7 @@ impl<'a> State<'a> {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_bind_group(0, &self.cell_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..VERTICES.len() as u32, 0..((GRID_SIZE * GRID_SIZE) as u32));
         }
