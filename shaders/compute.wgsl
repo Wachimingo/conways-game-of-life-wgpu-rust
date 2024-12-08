@@ -12,17 +12,17 @@ fn cellActive(x: u32, y: u32) -> u32 {
   return cellStateIn[cellIndex(vec2(x, y))];
 }
 
-@compute @workgroup_size(1)
+@compute @workgroup_size(8, 8)
 fn computeMain(@builtin(global_invocation_id) cell: vec3u) {
   // Determine how many active neighbors this cell has.
-  let activeNeighbors = cellActive(cell.x+1, cell.y+1) +
-                        cellActive(cell.x+1, cell.y) +
-                        cellActive(cell.x+1, cell.y-1) +
-                        cellActive(cell.x, cell.y-1) +
-                        cellActive(cell.x-1, cell.y-1) +
-                        cellActive(cell.x-1, cell.y) +
-                        cellActive(cell.x-1, cell.y+1) +
-                        cellActive(cell.x, cell.y+1);
+  let activeNeighbors = cellActive(cell.x+1u, cell.y+1u) +
+                        cellActive(cell.x+1u, cell.y) +
+                        cellActive(cell.x+1u, cell.y-1u) +
+                        cellActive(cell.x, cell.y-1u) +
+                        cellActive(cell.x-1u, cell.y-1u) +
+                        cellActive(cell.x-1u, cell.y) +
+                        cellActive(cell.x-1u, cell.y+1u) +
+                        cellActive(cell.x, cell.y+1u);
 
   let i = cellIndex(cell.xy);
 

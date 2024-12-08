@@ -131,7 +131,7 @@ impl<'a> State<'a> {
         let mut cell_state: Vec<u32> = vec![0; (GRID_SIZE * GRID_SIZE) as usize];
 
         for index in 0..cell_state.len() {
-            cell_state[index] = if rand::random::<f32>() > 0.6 {1} else {0};
+            cell_state[index] = if rand::random::<f32>() > 0.6 { 1 } else { 0 };
         }
 
         let cell_state_storage_buffer = [
@@ -162,14 +162,14 @@ impl<'a> State<'a> {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        visibility: wgpu::ShaderStages::VERTEX,
                         ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true},
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
                         count: None,
-                    }
+                    },
                 ],
                 label: Some("Cell binding group layout"),
             });
@@ -212,7 +212,7 @@ impl<'a> State<'a> {
             });
 
         let cell_bind_group = [
-             device.create_bind_group(&wgpu::BindGroupDescriptor {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &cell_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -239,7 +239,7 @@ impl<'a> State<'a> {
                     },
                 ],
                 label: Some("Cell Bind group B"),
-            })
+            }),
         ];
 
         let compute_bind_group = [
@@ -383,7 +383,7 @@ impl<'a> State<'a> {
             self.surface.configure(&self.device, &self.config);
         }
     }
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, _event: &WindowEvent) -> bool {
         false
     }
     fn update(&mut self) {
@@ -401,6 +401,7 @@ impl<'a> State<'a> {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
+        // COMPUTE PASS
         {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Compute pass"),
@@ -413,8 +414,10 @@ impl<'a> State<'a> {
                 &self.compute_bind_group[(&self.step % 2) as usize],
                 &[],
             );
-            compute_pass.dispatch_workgroups(1, 1, 1);
+            let workgroup_count = (GRID_SIZE / 8.0).ceil() as u32;
+            compute_pass.dispatch_workgroups(workgroup_count, workgroup_count, 1);
         }
+        // RENDER PASS
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -444,7 +447,7 @@ impl<'a> State<'a> {
                 0..((GRID_SIZE * GRID_SIZE) as u32),
             );
         }
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.submit(Some(encoder.finish()));
         output.present();
 
         Ok(())
