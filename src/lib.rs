@@ -17,7 +17,7 @@ struct State<'a> {
     render_pipeline: wgpu::RenderPipeline,
     compute_pipeline: wgpu::ComputePipeline,
     vertex_buffer: wgpu::Buffer,
-    cell_bind_group: wgpu::BindGroup,
+    cell_bind_group: [wgpu::BindGroup; 2],
     compute_bind_group: [wgpu::BindGroup; 2],
     step: u8,
 }
@@ -128,91 +128,119 @@ impl<'a> State<'a> {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        let mut cell_state: Vec<u32> = vec![0; (GRID_SIZE * GRID_SIZE) as usize];
+
+        for index in 0..cell_state.len() {
+            cell_state[index] = if rand::random::<f32>() > 0.6 {1} else {0};
+        }
+
         let cell_state_storage_buffer = [
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Cell state A buffer"),
-                contents: bytemuck::cast_slice(GRID),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, 
+                contents: bytemuck::cast_slice(&cell_state),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }),
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Cell state B buffer"),
-                contents: bytemuck::cast_slice(GRID),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, 
+                contents: bytemuck::cast_slice(&cell_state),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }),
         ];
 
-        let cell_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            //wgpu::BindGroupLayoutEntry {
-            //    binding: 1,
-            //    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::COMPUTE,
-            //    ty: wgpu::BindingType::Buffer {
-            //        ty: wgpu::BufferBindingType::Storage {
-            //            read_only: true,
-            //        },
-            //        has_dynamic_offset: false,
-            //        min_binding_size: None,
-            //    },
-            //    count: None,
-            //},
-            ],
-            label: Some("Cell binding group layout"),
-        });
-
-        let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage {
-                            read_only: true,
+        let cell_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
                         },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage {
-                            read_only: false,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true},
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
                         },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-            label: Some("Compute bind group layout"),
-        });
+                        count: None,
+                    }
+                ],
+                label: Some("Cell binding group layout"),
+            });
 
-        let cell_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &cell_bind_group_layout,
-            entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: grid_uniform_buffer.as_entire_binding(),
-            },
-            //wgpu::BindGroupEntry {
-            //    binding: 1,
-            //    resource: cell_state_storage_buffer.as_entire_binding(),
-            //}
-            ],
-            label: Some("Cell Bind group"),
-        });
+        let compute_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+                label: Some("Compute bind group layout"),
+            });
+
+        let cell_bind_group = [
+             device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &cell_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: grid_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                    },
+                ],
+                label: Some("Cell Bind group A"),
+            }),
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &cell_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: grid_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: cell_state_storage_buffer[1].as_entire_binding(),
+                    },
+                ],
+                label: Some("Cell Bind group B"),
+            })
+        ];
 
         let compute_bind_group = [
             device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -220,28 +248,36 @@ impl<'a> State<'a> {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                        resource: grid_uniform_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
+                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
                         resource: cell_state_storage_buffer[1].as_entire_binding(),
                     },
                 ],
-                label: Some("Compute bind group"),
+                label: Some("Compute bind group A"),
             }),
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &compute_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                        binding: 0,
+                        resource: grid_uniform_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: 1,
                         resource: cell_state_storage_buffer[1].as_entire_binding(),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: cell_state_storage_buffer[0].as_entire_binding(),
+                    },
                 ],
-                label: Some("Compute bind group"),
+                label: Some("Compute bind group B"),
             }),
         ];
 
@@ -260,13 +296,14 @@ impl<'a> State<'a> {
                 label: Some("Render pipeline Layout"),
                 bind_group_layouts: &[&cell_bind_group_layout],
                 push_constant_ranges: &[],
-        });
+            });
 
-        let compute_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Compute pipeline layout"),
-            bind_group_layouts: &[&compute_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Compute pipeline layout"),
+                bind_group_layouts: &[&compute_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render pipeline"),
@@ -353,6 +390,7 @@ impl<'a> State<'a> {
         //todo!()
     }
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        self.step = self.step.wrapping_add(1);
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -370,7 +408,11 @@ impl<'a> State<'a> {
             });
 
             compute_pass.set_pipeline(&self.compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_bind_group[(&self.step % 2) as usize], &[]);
+            compute_pass.set_bind_group(
+                0,
+                &self.compute_bind_group[(&self.step % 2) as usize],
+                &[],
+            );
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
         {
@@ -395,9 +437,12 @@ impl<'a> State<'a> {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.cell_bind_group, &[]);
+            render_pass.set_bind_group(0, &self.cell_bind_group[(self.step % 2) as usize], &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..VERTICES.len() as u32, 0..((GRID_SIZE * GRID_SIZE) as u32));
+            render_pass.draw(
+                0..VERTICES.len() as u32,
+                0..((GRID_SIZE * GRID_SIZE) as u32),
+            );
         }
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
