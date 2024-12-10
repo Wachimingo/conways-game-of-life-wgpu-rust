@@ -49,6 +49,11 @@ impl<'a> winit::application::ApplicationHandler for StateApplication<'a> {
             }
         }
     }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop){
+        let window = self.state.as_ref().unwrap().window();
+        window.request_redraw();
+    }
 }
 
 struct State<'a> {
