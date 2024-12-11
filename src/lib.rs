@@ -1,6 +1,8 @@
 use pollster::FutureExt;
 use wgpu::util::DeviceExt;
 
+const WAIT_TIME: std::time::Duration = std::time::Duration::from_millis(500);
+
 use winit::{
     event::*,
     event_loop::{ActiveEventLoop, EventLoop},
@@ -16,6 +18,13 @@ impl<'a> StateApplication<'a> {
     pub fn new() -> Self {
         Self { state: None }
     }
+}
+
+pub async fn run() {
+    env_logger::init();
+    let event_loop = EventLoop::new().unwrap();
+    let mut window_state = StateApplication::new();
+    let _ = event_loop.run_app(&mut window_state);
 }
 
 impl<'a> winit::application::ApplicationHandler for StateApplication<'a> {
@@ -50,8 +59,10 @@ impl<'a> winit::application::ApplicationHandler for StateApplication<'a> {
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop){
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let window = self.state.as_ref().unwrap().window();
+        std::thread::sleep(WAIT_TIME);
+        event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
         window.request_redraw();
     }
 }
@@ -502,11 +513,4 @@ impl<'a> State<'a> {
 
         Ok(())
     }
-}
-
-pub async fn run() {
-    env_logger::init();
-    let event_loop = EventLoop::new().unwrap();
-    let mut window_state = StateApplication::new();
-    let _ = event_loop.run_app(&mut window_state);
 }
