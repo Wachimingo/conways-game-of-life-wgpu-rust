@@ -1,7 +1,9 @@
 use pollster::FutureExt;
 use wgpu::util::DeviceExt;
 
-const WAIT_TIME: std::time::Duration = std::time::Duration::from_millis(500);
+const TIME: u64 = 1000;
+const MAX_FPS: u64 = 24;
+const WAIT_TIME: std::time::Duration = std::time::Duration::from_millis(TIME / MAX_FPS);
 
 use winit::{
     event::*,
