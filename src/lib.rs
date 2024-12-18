@@ -1,6 +1,11 @@
 use pollster::FutureExt;
 use wgpu::util::DeviceExt;
 
+mod binds;
+mod layouts;
+use binds::{get_cell_bind_groups, get_compute_bind_groups};
+use layouts::{get_cell_bind_group_layout, get_compute_bind_group_layout};
+
 const TIME: u64 = 1000;
 const MAX_FPS: u64 = 24;
 const WAIT_TIME: std::time::Duration = std::time::Duration::from_millis(TIME / MAX_FPS);
@@ -12,13 +17,24 @@ use winit::{
     window::{Window, WindowId},
 };
 
+#[derive(Debug)]
+struct Cursor {
+    x: f64,
+    y: f64,
+}
+
+// Window state
 struct StateApplication<'a> {
     state: Option<State<'a>>,
+    cursor: Cursor,
 }
 
 impl<'a> StateApplication<'a> {
     pub fn new() -> Self {
-        Self { state: None }
+        Self {
+            state: None,
+            cursor: Cursor { x: 0.0, y: 0.0 },
+        }
     }
 }
 
@@ -55,6 +71,18 @@ impl<'a> winit::application::ApplicationHandler for StateApplication<'a> {
                 }
                 WindowEvent::RedrawRequested => {
                     self.state.as_mut().unwrap().render().unwrap();
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    self.cursor.x = position.x;
+                    self.cursor.y = position.y;
+                    //println!("{:?}", position.x);
+                }
+                WindowEvent::MouseInput {
+                    button: MouseButton::Left,
+                    state: ElementState::Pressed,
+                    ..
+                } => {
+                    println!("{:?}", self.cursor);
                 }
                 _ => {}
             }
@@ -210,139 +238,23 @@ impl<'a> State<'a> {
             }),
         ];
 
-        let cell_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-                label: Some("Cell binding group layout"),
-            });
+        let cell_bind_group_layout = get_cell_bind_group_layout(&device);
 
-        let compute_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-                label: Some("Compute bind group layout"),
-            });
+        let compute_bind_group_layout = get_compute_bind_group_layout(&device);
 
-        let cell_bind_group = [
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &cell_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: grid_uniform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: cell_state_storage_buffer[0].as_entire_binding(),
-                    },
-                ],
-                label: Some("Cell Bind group A"),
-            }),
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &cell_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: grid_uniform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: cell_state_storage_buffer[1].as_entire_binding(),
-                    },
-                ],
-                label: Some("Cell Bind group B"),
-            }),
-        ];
+        let cell_bind_group = get_cell_bind_groups(
+            &device,
+            &cell_bind_group_layout,
+            &grid_uniform_buffer,
+            &cell_state_storage_buffer,
+        );
 
-        let compute_bind_group = [
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &compute_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: grid_uniform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: cell_state_storage_buffer[0].as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: cell_state_storage_buffer[1].as_entire_binding(),
-                    },
-                ],
-                label: Some("Compute bind group A"),
-            }),
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &compute_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: grid_uniform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: cell_state_storage_buffer[1].as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: cell_state_storage_buffer[0].as_entire_binding(),
-                    },
-                ],
-                label: Some("Compute bind group B"),
-            }),
-        ];
+        let compute_bind_group = get_compute_bind_groups(
+            &device,
+            &compute_bind_group_layout,
+            &grid_uniform_buffer,
+            &cell_state_storage_buffer,
+        );
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -446,8 +358,12 @@ impl<'a> State<'a> {
             self.surface.configure(&self.device, &self.config);
         }
     }
-    fn input(&mut self, _event: &WindowEvent) -> bool {
+    fn input(&mut self, event: &WindowEvent) -> bool {
+        println!("{:?}", event);
         false
+        //match event {
+        //
+        //}
     }
     fn update(&mut self) {
         //todo!()
