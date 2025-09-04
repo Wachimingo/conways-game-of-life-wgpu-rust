@@ -160,7 +160,7 @@ impl<'a> State<'a> {
         let window = std::sync::Arc::new(window_arc);
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN,
             ..Default::default()
         });
@@ -182,8 +182,8 @@ impl<'a> State<'a> {
                     required_limits: wgpu::Limits::default(),
                     label: None,
                     memory_hints: Default::default(),
+                    trace: wgpu::Trace::Off,
                 },
-                None,
             )
             .block_on()
             .unwrap();
@@ -412,6 +412,7 @@ impl<'a> State<'a> {
                         }),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
